@@ -11,7 +11,7 @@ repositories {
 }
 
 ext {
-	smackVersion="4.4.0-alpha1-SNAPSHOT"
+	smackVersion="4.4.0-alpha3-SNAPSHOT"
 }
 
 dependencies {
@@ -19,6 +19,8 @@ dependencies {
     compile "org.igniterealtime.smack:smack-omemo-signal:$smackVersion"
     compile "org.igniterealtime.smack:smack-resolver-dnsjava:$smackVersion"
     compile "org.igniterealtime.smack:smack-tcp:$smackVersion"
+// https://mvnrepository.com/artifact/org.bouncycastle/bcprov-jdk15on
+	compile group: 'org.bouncycastle', name: 'bcprov-jdk15on', version: '1.64'
 
     compile "org.jline:jline:3.2.0"
 }
