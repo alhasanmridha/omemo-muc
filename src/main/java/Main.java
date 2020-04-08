@@ -38,7 +38,6 @@ import org.jline.terminal.Terminal;
 import org.jline.terminal.TerminalBuilder;
 import org.jxmpp.jid.BareJid;
 import org.jxmpp.jid.EntityBareJid;
-import org.jxmpp.jid.FullJid;
 import org.jxmpp.jid.impl.JidCreate;
 import org.jxmpp.jid.parts.Resourcepart;
 import org.jxmpp.stringprep.XmppStringprepException;
@@ -51,6 +50,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Scanner;
+import java.util.concurrent.ThreadLocalRandom;
 
 
 /**
@@ -64,12 +64,12 @@ public class Main {
     private OmemoManager omemoManager;
     private MultiUserChatManager mucm;
     private final static File storePath = new File("store");
-    private int mCounter = 0;
-    private int numberOfParticipants = 10;
-    private int totalNumberOfmessage = 500;
+    private int sendCounter = 0;
+    private int receiveCounter = 0;
+    private int totalNumberOfMessage = 15;
     private static String GJID,GPASSWORD;
     private Main() {
-        SmackConfiguration.DEBUG = true;
+//        SmackConfiguration.DEBUG = true;
         OmemoConfiguration.setAddOmemoHintBody(false);
         Security.addProvider(new BouncyCastleProvider());
     }
@@ -130,6 +130,27 @@ public class Main {
                 }
             }
         });
+        connection.addConnectionListener(new ConnectionListener() {
+            @Override
+            public void connected(XMPPConnection connection) {
+                System.out.println("Connection Successful");
+            }
+
+            @Override
+            public void authenticated(XMPPConnection connection, boolean resumed) {
+                System.out.println("Login Successful");
+            }
+
+            @Override
+            public void connectionClosed() {
+                System.out.println("Connection Closed");
+            }
+
+            @Override
+            public void connectionClosedOnError(Exception e) {
+                System.out.println("Connection ClosedOnError: " + e.getMessage());
+            }
+        });
         connection.setReplyTimeout(10000);
         connection = connection.connect();
         connection.login();
@@ -171,11 +192,11 @@ public class Main {
             }
             String s = received.getBody();
             if(s!=null){
-                mCounter++;
-                String curState = String.valueOf(mCounter % numberOfParticipants);
-                if(curState.equalsIgnoreCase(String.valueOf(GJID.charAt(GJID.length()-1)))){
+                receiveCounter++;
+                int curState = ThreadLocalRandom.current().nextInt(0, 3);
+                if(curState == 1){
                     try {
-                        sendMucMessage(mucJid, ("Hi There! I am message no." + mCounter).split(" "));
+                        sendMucMessage(mucJid, "Hi There! I am message no." + sendCounter + " from " + connection.getUser().asEntityBareJidString());
                     } catch (IOException | SmackException.NotLoggedInException | InterruptedException | CannotEstablishOmemoSessionException | PubSubException.NotALeafNodeException | XMPPException.XMPPErrorException | SmackException.NotConnectedException | CorruptedOmemoKeyException | SmackException.NoResponseException | UndecidedOmemoIdentityException | NoOmemoSupportException | CryptoFailedException e) {
                         e.printStackTrace();
                     }
@@ -187,11 +208,6 @@ public class Main {
                 reader.callWidget(LineReader.REDRAW_LINE);
                 reader.callWidget(LineReader.REDISPLAY);
                 reader.getTerminal().writer().flush();
-            }
-            if(mCounter >= totalNumberOfmessage){
-                System.out.println("+++++++++++++++++++++++++++++");
-                System.out.println("I have got all the messages :)");
-                System.out.println("+++++++++++++++++++++++++++++");
             }
         };
 
@@ -263,11 +279,14 @@ public class Main {
                 connection.disconnect(new Presence(Presence.Type.unavailable, "Smack is still alive :D", 100, Presence.Mode.away));
                 break;
             }
-
+            else if (line.startsWith("/testresult")) {
+                System.out.println("Total send: " + sendCounter);
+                System.out.println("Total received: " + receiveCounter);
+            }
             else if (line.startsWith("/start")) {
 //                if(split.length == 2){
-                    sendMucMessage(mucJid,"Hi There! I am the first message.".split(" "));
-                    mCounter = 1;
+                    sendMucMessage(mucJid,"Hi There! I am the first message.");
+                    sendCounter = 1;
 //                }
             }
 
@@ -729,13 +748,9 @@ public class Main {
             }
         }
     }
-    public void sendMucMessage(EntityBareJid mucJid, String[] split) throws IOException, SmackException.NotLoggedInException, InterruptedException, CannotEstablishOmemoSessionException, PubSubException.NotALeafNodeException, XMPPException.XMPPErrorException, SmackException.NotConnectedException, CorruptedOmemoKeyException, SmackException.NoResponseException, UndecidedOmemoIdentityException, NoOmemoSupportException, CryptoFailedException {
-        if(mCounter >= totalNumberOfmessage) return;
+    public void sendMucMessage(EntityBareJid mucJid, String message) throws IOException, SmackException.NotLoggedInException, InterruptedException, CannotEstablishOmemoSessionException, PubSubException.NotALeafNodeException, XMPPException.XMPPErrorException, SmackException.NotConnectedException, CorruptedOmemoKeyException, SmackException.NoResponseException, UndecidedOmemoIdentityException, NoOmemoSupportException, CryptoFailedException {
+        if(sendCounter >= totalNumberOfMessage) return;
         if (mucJid != null) {
-            String message = "";
-            for (int i = 0; i < split.length; i++) {
-                message += split[i] + " ";
-            }
             MultiUserChat muc = mucm.getMultiUserChat(mucJid.asEntityBareJidIfPossible());
             OmemoMessage.Sent encrypted = null;
             try {
@@ -758,13 +773,8 @@ public class Main {
                 Message m = new Message();
                 m.addExtension(encrypted.getElement());
                 muc.sendMessage(m);
-                mCounter++;
+                sendCounter++;
             }
-        }
-        if(mCounter >= totalNumberOfmessage){
-            System.out.println("+++++++++++++++++++++++++++++");
-            System.out.println("I am the last one :)!!!!!!!!!");
-            System.out.println("+++++++++++++++++++++++++++++");
         }
     }
 }
