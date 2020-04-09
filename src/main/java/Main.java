@@ -50,7 +50,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Scanner;
-import java.util.concurrent.ThreadLocalRandom;
 
 
 /**
@@ -66,10 +65,10 @@ public class Main {
     private final static File storePath = new File("store");
     private int sendCounter = 0;
     private int receiveCounter = 0;
-    private int totalNumberOfMessage = 15;
+    private int totalNumberOfMessage = 30;
     private static String GJID,GPASSWORD;
     private Main() {
-//        SmackConfiguration.DEBUG = true;
+        SmackConfiguration.DEBUG = false;
         OmemoConfiguration.setAddOmemoHintBody(false);
         Security.addProvider(new BouncyCastleProvider());
     }
@@ -191,23 +190,20 @@ public class Main {
                 return;
             }
             String s = received.getBody();
-            if(s!=null){
-                receiveCounter++;
-                int curState = ThreadLocalRandom.current().nextInt(0, 3);
-                if(curState == 1){
-                    try {
-                        sendMucMessage(mucJid, "Hi There! I am message no." + sendCounter + " from " + connection.getUser().asEntityBareJidString());
-                    } catch (IOException | SmackException.NotLoggedInException | InterruptedException | CannotEstablishOmemoSessionException | PubSubException.NotALeafNodeException | XMPPException.XMPPErrorException | SmackException.NotConnectedException | CorruptedOmemoKeyException | SmackException.NoResponseException | UndecidedOmemoIdentityException | NoOmemoSupportException | CryptoFailedException e) {
-                        e.printStackTrace();
-                    }
-                }
-            }
             if (multiUserChat != null && bareJid != null && s != null) {
                 reader.callWidget(LineReader.CLEAR);
                 reader.getTerminal().writer().println("\033[36m" + multiUserChat.getRoom() + ": " + bareJid + ": " + s);
                 reader.callWidget(LineReader.REDRAW_LINE);
                 reader.callWidget(LineReader.REDISPLAY);
                 reader.getTerminal().writer().flush();
+            }
+            if(s!=null){
+                increaseReceiveCounter();
+                try {
+                    sendMucMessage(mucJid, "Hi There! I am message no." + sendCounter + " from " + connection.getUser().asEntityBareJidString());
+                } catch (IOException | SmackException.NotLoggedInException | InterruptedException | CannotEstablishOmemoSessionException | PubSubException.NotALeafNodeException | XMPPException.XMPPErrorException | SmackException.NotConnectedException | CorruptedOmemoKeyException | SmackException.NoResponseException | UndecidedOmemoIdentityException | NoOmemoSupportException | CryptoFailedException e) {
+                    e.printStackTrace();
+                }
             }
         };
 
@@ -282,6 +278,10 @@ public class Main {
             else if (line.startsWith("/testresult")) {
                 System.out.println("Total send: " + sendCounter);
                 System.out.println("Total received: " + receiveCounter);
+            }
+            else if (line.startsWith("/resetcounter")) {
+                sendCounter = 0;
+                receiveCounter = 0;
             }
             else if (line.startsWith("/start")) {
 //                if(split.length == 2){
@@ -409,7 +409,7 @@ public class Main {
             else if(line.startsWith("/omemo")) {
                 if(split.length == 1) {
                 } else {
-                    BareJid recipient = getJid(split[1]);
+                    BareJid recipient = getJid(split[1] + "@ckotha.com");
                     if (recipient != null) {
                         String message = "";
                         for (int i = 2; i < split.length; i++) {
@@ -422,7 +422,15 @@ public class Main {
                             System.out.println("There are undecided identities:");
                             for(OmemoDevice d : e.getUndecidedDevices()) {
                                 System.out.println(d.toString());
+                                BareJid jid = getJid(d.toString().split(":")[0]);
+                                trustUser(jid);
                             }
+                        } catch (SmackException.NotConnectedException | IOException | CryptoFailedException | SmackException.NotLoggedInException | SmackException.NoResponseException | InterruptedException e){
+                            e.printStackTrace();
+                        }
+                        if(encrypted == null){
+                            encrypted = omemoManager.encrypt(recipient, message.trim());
+                            System.out.println("Trying to encrypt after trusting some undecided user");
                         }
                         if(encrypted != null) {
                             current = cm.createChat(recipient.asEntityJidIfPossible());
@@ -583,7 +591,7 @@ public class Main {
 
             // If no command is entered, assume chat with contact is still active -> send message
             else {
-                if(current != null) {
+                if(current != null && line.length()>0) {
                     if(!omemo) {
                         current.sendMessage(line);
                     } else {
@@ -748,8 +756,9 @@ public class Main {
             }
         }
     }
-    public void sendMucMessage(EntityBareJid mucJid, String message) throws IOException, SmackException.NotLoggedInException, InterruptedException, CannotEstablishOmemoSessionException, PubSubException.NotALeafNodeException, XMPPException.XMPPErrorException, SmackException.NotConnectedException, CorruptedOmemoKeyException, SmackException.NoResponseException, UndecidedOmemoIdentityException, NoOmemoSupportException, CryptoFailedException {
-        if(sendCounter >= totalNumberOfMessage) return;
+    public synchronized void sendMucMessage(EntityBareJid mucJid, String message) throws IOException, SmackException.NotLoggedInException, InterruptedException, CannotEstablishOmemoSessionException, PubSubException.NotALeafNodeException, XMPPException.XMPPErrorException, SmackException.NotConnectedException, CorruptedOmemoKeyException, SmackException.NoResponseException, UndecidedOmemoIdentityException, NoOmemoSupportException, CryptoFailedException {
+        if(sendCounter == totalNumberOfMessage) return;
+        Thread.sleep(1000);
         if (mucJid != null) {
             MultiUserChat muc = mucm.getMultiUserChat(mucJid.asEntityBareJidIfPossible());
             OmemoMessage.Sent encrypted = null;
@@ -776,5 +785,8 @@ public class Main {
                 sendCounter++;
             }
         }
+    }
+    private synchronized void increaseReceiveCounter(){
+        receiveCounter++;
     }
 }
