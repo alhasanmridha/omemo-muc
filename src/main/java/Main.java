@@ -65,7 +65,7 @@ public class Main {
     private final static File storePath = new File("store");
     private int sendCounter = 0;
     private int receiveCounter = 0;
-    private int totalNumberOfMessage = 30;
+    private int totalNumberOfMessage = 10;
     private static String GJID,GPASSWORD;
     private Main() {
         SmackConfiguration.DEBUG = false;
@@ -167,6 +167,7 @@ public class Main {
             public void onOmemoMessageReceived(Stanza stanza, OmemoMessage.Received received) {
                 BareJid sender = stanza.getFrom().asBareJid();
                 if (received.isKeyTransportMessage()) {
+                    System.out.println("Got keyTransported message for omemo: "+sender.toString());
                     return;
                 }
                 String decryptedBody = received.getBody();
@@ -187,6 +188,7 @@ public class Main {
         OmemoMucMessageListener mucMessageListener = (multiUserChat, stanza, received) -> {
             BareJid bareJid = received.getSenderDevice().getJid();
             if (received.isKeyTransportMessage()) {
+                System.out.println("Got keyTransported message for muc: "+bareJid.toString());
                 return;
             }
             String s = received.getBody();
