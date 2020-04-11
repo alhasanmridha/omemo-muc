@@ -210,7 +210,7 @@ public class Main {
         };
 
         // Carbon Copies
-        CarbonManager.getInstanceFor(connection).enableCarbons();
+//        CarbonManager.getInstanceFor(connection).enableCarbons();
 
         omemoManager.addOmemoMessageListener(messageListener);
         omemoManager.addOmemoMucMessageListener(mucMessageListener);
@@ -356,9 +356,8 @@ public class Main {
                     }
                 }
             }
-
             // Make trust decisions for keys of a user
-            else if(line.startsWith("/trust")) {
+            else if(line.startsWith("/trust ")) {
                 if(split.length == 2) {
                     System.out.println("Usage: \n0: Untrusted, 1: Trusted, otherwise: Undecided");
                     BareJid jid = getJid(split[1] + "@ckotha.com");
@@ -368,35 +367,24 @@ public class Main {
                     }
 
                     System.out.println(jid);
-
-                    omemoManager.requestDeviceListUpdateFor(jid);
-
-                    for (OmemoDevice device : omemoManager.getDevicesOf(jid)) {
-                        OmemoFingerprint fp = omemoManager.getFingerprint(device);
-
-                        if (omemoManager.isDecidedOmemoIdentity(device, fp)) {
-                            if (omemoManager.isTrustedOmemoIdentity(device, fp)) {
-                                System.out.println("Status: Trusted");
-                            } else {
-                                System.out.println("Status: Untrusted");
-                            }
-                        } else {
-                            System.out.println("Status: Undecided");
-                        }
-
-                        System.out.println(fp.blocksOf8Chars());
-                        String decision = "1";
-                        if (decision.equals("0")) {
-                            omemoManager.distrustOmemoIdentity(device, fp);
-                            System.out.println("Identity has been untrusted.");
-                        } else if (decision.equals("1")) {
-                            omemoManager.trustOmemoIdentity(device, fp);
-                            System.out.println("Identity has been trusted.");
-                        }
-                    }
+                    trustUser(jid);
                 }
 
             }
+            // Make trust decisions for all user
+            else if(line.startsWith("/trust")) {
+                System.out.println("Trusting all users");
+                for(int i=0;i<10;i++) {
+                    BareJid jid = getJid("test" + i + "@ckotha.com");
+
+                    if (jid == null) {
+                        continue;
+                    }
+                    System.out.println(jid);
+                    trust(jid);
+                }
+            }
+
 
             // Delete foreign OMEMO devices from own device list
             else if(line.startsWith("/purge")) {
@@ -790,5 +778,32 @@ public class Main {
     }
     private synchronized void increaseReceiveCounter(){
         receiveCounter++;
+    }
+    public void trust(BareJid jid) throws InterruptedException, PubSubException.NotALeafNodeException, SmackException.NoResponseException, SmackException.NotConnectedException, XMPPException.XMPPErrorException, IOException, SmackException.NotLoggedInException, CorruptedOmemoKeyException, CannotEstablishOmemoSessionException {
+        omemoManager.requestDeviceListUpdateFor(jid);
+
+        for (OmemoDevice device : omemoManager.getDevicesOf(jid)) {
+            OmemoFingerprint fp = omemoManager.getFingerprint(device);
+
+            if (omemoManager.isDecidedOmemoIdentity(device, fp)) {
+                if (omemoManager.isTrustedOmemoIdentity(device, fp)) {
+                    System.out.println("Status: Trusted");
+                } else {
+                    System.out.println("Status: Untrusted");
+                }
+            } else {
+                System.out.println("Status: Undecided");
+            }
+
+            System.out.println(fp.blocksOf8Chars());
+            String decision = "1";
+            if (decision.equals("0")) {
+                omemoManager.distrustOmemoIdentity(device, fp);
+                System.out.println("Identity has been untrusted.");
+            } else if (decision.equals("1")) {
+                omemoManager.trustOmemoIdentity(device, fp);
+                System.out.println("Identity has been trusted.");
+            }
+        }
     }
 }
