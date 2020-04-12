@@ -67,6 +67,7 @@ public class Main {
     private int receiveCounter = 0;
     private int totalNumberOfMessage = 10;
     private static String GJID,GPASSWORD;
+    private static String rootName;
     private Main() {
         SmackConfiguration.DEBUG = false;
         OmemoConfiguration.setAddOmemoHintBody(false);
@@ -156,9 +157,9 @@ public class Main {
         omemoManager.initialize();
 
         // Create the XMPP address (JID) of the MUC.
-        EntityBareJid mucJid = JidCreate.entityBareFrom("ag@conference.ckotha.com");
+        EntityBareJid mucJid = JidCreate.entityBareFrom(rootName+"grp@conference.ckotha.com");
 
-        Resourcepart nickname = Resourcepart.from("testbot");
+        Resourcepart nickname = Resourcepart.from(rootName+"bot");
 
         System.out.println("Logged in. Begin setting up OMEMO...");
 
@@ -375,7 +376,7 @@ public class Main {
             else if(line.startsWith("/trust")) {
                 System.out.println("Trusting all users");
                 for(int i=0;i<10;i++) {
-                    BareJid jid = getJid("test" + i + "@ckotha.com");
+                    BareJid jid = getJid(rootName + i + "@ckotha.com");
 
                     if (jid == null) {
                         continue;
@@ -517,7 +518,6 @@ public class Main {
                     MultiUserChat multiUserChat = mucm.getMultiUserChat(mucJid);
                     multiUserChat.addInvitationRejectionListener((invitee, reason, message, rejection) -> System.out.println("Invitation rejected"));
                     for (int i = 1; i < split.length; i++) {
-                        System.out.println("Inviting test" + i);
                         multiUserChat.invite(JidCreate.entityBareFrom(split[i] + "@ckotha.com"), "No reason. Just want to talk.");
                     }
                 }
@@ -527,8 +527,8 @@ public class Main {
                 MultiUserChat multiUserChat = mucm.getMultiUserChat(mucJid);
                 multiUserChat.addInvitationRejectionListener((invitee, reason, message, rejection) -> System.out.println("Invitation rejected"));
                 for(int i=1;i<10;i++) {
-                    System.out.println("Inviting test"+i);
-                    multiUserChat.invite(JidCreate.entityBareFrom("test" + i + "@ckotha.com"), "No reason. Just want to talk.");
+                    System.out.println("Inviting "+rootName+i);
+                    multiUserChat.invite(JidCreate.entityBareFrom(rootName + i + "@ckotha.com"), "No reason. Just want to talk.");
                 }
             }
             else if(line.startsWith("/delete")){
@@ -608,6 +608,7 @@ public class Main {
         try {
             GJID = args[0];
             GPASSWORD = args[1];
+            rootName = GJID.substring(0,GJID.length()-1);
             System.out.println("User: " + GJID);
             Main main = new Main();
             main.start();
@@ -796,14 +797,8 @@ public class Main {
             }
 
             System.out.println(fp.blocksOf8Chars());
-            String decision = "1";
-            if (decision.equals("0")) {
-                omemoManager.distrustOmemoIdentity(device, fp);
-                System.out.println("Identity has been untrusted.");
-            } else if (decision.equals("1")) {
-                omemoManager.trustOmemoIdentity(device, fp);
-                System.out.println("Identity has been trusted.");
-            }
+            omemoManager.trustOmemoIdentity(device, fp);
+            System.out.println("Identity has been trusted.");
         }
     }
 }
