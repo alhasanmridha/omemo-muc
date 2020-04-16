@@ -9,6 +9,7 @@ import org.jivesoftware.smack.roster.Roster;
 import org.jivesoftware.smack.roster.RosterEntry;
 import org.jivesoftware.smack.tcp.XMPPTCPConnection;
 import org.jivesoftware.smack.tcp.XMPPTCPConnectionConfiguration;
+import org.jivesoftware.smack.util.StringUtils;
 import org.jivesoftware.smack.util.TLSUtils;
 import org.jivesoftware.smackx.carbons.CarbonManager;
 import org.jivesoftware.smackx.carbons.packet.CarbonExtension;
@@ -19,6 +20,7 @@ import org.jivesoftware.smackx.muc.RoomInfo;
 import org.jivesoftware.smackx.omemo.OmemoConfiguration;
 import org.jivesoftware.smackx.omemo.OmemoManager;
 import org.jivesoftware.smackx.omemo.OmemoMessage;
+import org.jivesoftware.smackx.omemo.OmemoService;
 import org.jivesoftware.smackx.omemo.exceptions.*;
 import org.jivesoftware.smackx.omemo.internal.OmemoCachedDeviceList;
 import org.jivesoftware.smackx.omemo.internal.OmemoDevice;
@@ -46,10 +48,7 @@ import org.whispersystems.libsignal.IdentityKey;
 import java.io.*;
 import java.net.InetAddress;
 import java.security.Security;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Scanner;
+import java.util.*;
 
 
 /**
@@ -62,12 +61,16 @@ public class Main {
     private AbstractXMPPConnection connection;
     private OmemoManager omemoManager;
     private MultiUserChatManager mucm;
+    private Roster roster;
     private final static File storePath = new File("store");
     private int sendCounter = 0;
     private int receiveCounter = 0;
     private int totalNumberOfMessage = 10;
     private static String GJID,GPASSWORD;
+    private static final String serverName = "ckotha.com";
     private static String rootName;
+    private SignalOmemoService service;
+
     private Main() {
         SmackConfiguration.DEBUG = false;
         OmemoConfiguration.setAddOmemoHintBody(false);
@@ -95,8 +98,8 @@ public class Main {
         }
         XMPPTCPConnectionConfiguration.Builder configBuilder = XMPPTCPConnectionConfiguration.builder()
                 .setUsernameAndPassword(jidname,password)
-                .setXmppDomain("ckotha.com")
-                .setHostAddress(InetAddress.getByName("ckotha.com"))
+                .setXmppDomain(serverName)
+                .setHostAddress(InetAddress.getByName(serverName))
                 .setResource("omemo")
                 .setSecurityMode(ConnectionConfiguration.SecurityMode.required)
                 .setPort(5222);
@@ -106,9 +109,8 @@ public class Main {
         connection = new XMPPTCPConnection(config);
         SignalOmemoService.acknowledgeLicense();
         SignalOmemoService.setup();
-        SignalOmemoService service = (SignalOmemoService) SignalOmemoService.getInstance();
+        service = (SignalOmemoService) SignalOmemoService.getInstance();
         service.setOmemoStoreBackend(new SignalCachingOmemoStore(new SignalFileBasedOmemoStore(storePath)));
-
         omemoManager = OmemoManager.getInstanceFor(connection);
         omemoManager.setTrustCallback(new OmemoTrustCallback() {
             @Override
@@ -160,7 +162,6 @@ public class Main {
         EntityBareJid mucJid = JidCreate.entityBareFrom(rootName+"grp@conference.ckotha.com");
 
         Resourcepart nickname = Resourcepart.from(rootName+"bot");
-
         System.out.println("Logged in. Begin setting up OMEMO...");
 
         OmemoMessageListener messageListener = new OmemoMessageListener() {
@@ -168,7 +169,7 @@ public class Main {
             public void onOmemoMessageReceived(Stanza stanza, OmemoMessage.Received received) {
                 BareJid sender = stanza.getFrom().asBareJid();
                 if (received.isKeyTransportMessage()) {
-                    System.out.println("Got keyTransported message for omemo: "+sender.toString());
+                    System.out.println("Got keyTransported message for: "+sender.toString());
                     return;
                 }
                 String decryptedBody = received.getBody();
@@ -217,9 +218,13 @@ public class Main {
         omemoManager.addOmemoMucMessageListener(mucMessageListener);
 
         // Contact list
-        Roster roster = Roster.getInstanceFor(connection);
+        roster = Roster.getInstanceFor(connection);
         roster.setSubscriptionMode(Roster.SubscriptionMode.accept_all);
-
+        if(rebuildSession()){
+            System.out.println("Session built successfully");
+        } else{
+            System.out.println("Session building failed");
+        }
         // Single Chats
         ChatManager cm = ChatManager.getInstanceFor(connection);
         cm.addChatListener((chat, b) -> chat.addMessageListener((chat1, message) -> {
@@ -327,7 +332,7 @@ public class Main {
 
                 // List presences of one contact, as well as OMEMO fingerprints
                 else {
-                    BareJid jid = getJid(split[1]);
+                    BareJid jid = getJid(split[1] + "@" + serverName);
                     try {
                         List<Presence> presences = roster.getAllPresences(jid);
                         for(Presence p : presences) {
@@ -361,15 +366,27 @@ public class Main {
             else if(line.startsWith("/trust ")) {
                 if(split.length >= 2) {
                     System.out.println("Usage: \n0: Untrusted, 1: Trusted, otherwise: Undecided");
-                    for (int i = 1; i < split.length; i++){
-                        BareJid jid = getJid(split[i] + "@ckotha.com");
+                    if (split[1].matches("-?\\d+(\\.\\d+)?")) {
+                        int numberOfUser = Integer.parseInt(split[1]);
+                        for (int i = 0; i < numberOfUser; i++) {
+                            BareJid jid = getJid(rootName + i + "@" + serverName);
 
-                        if (jid == null) {
-                            continue;
+                            if (jid == null) {
+                                continue;
+                            }
+                            System.out.println(jid);
+                            trust(jid);
                         }
+                    } else {
+                        for (int i = 1; i < split.length; i++) {
+                            BareJid jid = getJid(split[i] + "@" + serverName);
 
-                        System.out.println(jid);
-                        trustUser(jid);
+                            if (jid == null) {
+                                continue;
+                            }
+                            System.out.println(jid);
+                            trustUser(jid);
+                        }
                     }
                 }
 
@@ -378,8 +395,7 @@ public class Main {
             else if(line.startsWith("/trust")) {
                 System.out.println("Trusting all users");
                 for(int i=0;i<10;i++) {
-                    BareJid jid = getJid(rootName + i + "@ckotha.com");
-
+                    BareJid jid = getJid(rootName + i + "@" + serverName);
                     if (jid == null) {
                         continue;
                     }
@@ -402,7 +418,7 @@ public class Main {
             else if(line.startsWith("/omemo")) {
                 if(split.length == 1) {
                 } else {
-                    BareJid recipient = getJid(split[1] + "@ckotha.com");
+                    BareJid recipient = getJid(split[1] + "@" + serverName);
                     if (recipient != null) {
                         String message = "";
                         for (int i = 2; i < split.length; i++) {
@@ -802,5 +818,25 @@ public class Main {
             omemoManager.trustOmemoIdentity(device, fp);
             System.out.println("Identity has been trusted.");
         }
+    }
+
+    private boolean rebuildSession() throws IOException, CorruptedOmemoKeyException, InterruptedException, SmackException.NoResponseException, SmackException.NotConnectedException, CannotEstablishOmemoSessionException, SmackException.NotLoggedInException {
+        Set<OmemoDevice> devices = omemoManager.getDevicesOf(omemoManager.getOwnJid());
+        for (RosterEntry r : roster.getEntries()) {
+            if(roster.getPresence(r.getJid()).isAvailable()) {
+                System.out.println("::::::::::::::::: : Al-Hasan : :::::::::::::::::::::::: : Building Session with ::: " + r.getJid() + ", Online? " + roster.getPresence(r.getJid()).isAvailable());
+                devices.addAll(omemoManager.getDevicesOf(r.getJid()));
+                for (OmemoDevice device : devices) {
+                    if(service.getOmemoStoreBackend().loadRawSession(omemoManager.getOwnDevice(),device) == null) {
+                        System.out.println("Trying to build a fresh session with " + device.getDeviceId());
+                        omemoManager.rebuildSessionWith(device);
+                    } else{
+                        System.out.println("Already has session with: " + device.getDeviceId());
+                    }
+                }
+            }
+        }
+
+        return true;
     }
 }
