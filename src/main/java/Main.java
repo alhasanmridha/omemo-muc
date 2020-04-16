@@ -359,16 +359,18 @@ public class Main {
             }
             // Make trust decisions for keys of a user
             else if(line.startsWith("/trust ")) {
-                if(split.length == 2) {
+                if(split.length >= 2) {
                     System.out.println("Usage: \n0: Untrusted, 1: Trusted, otherwise: Undecided");
-                    BareJid jid = getJid(split[1] + "@ckotha.com");
+                    for (int i = 1; i < split.length; i++){
+                        BareJid jid = getJid(split[i] + "@ckotha.com");
 
-                    if(jid == null) {
-                        continue;
+                        if (jid == null) {
+                            continue;
+                        }
+
+                        System.out.println(jid);
+                        trustUser(jid);
                     }
-
-                    System.out.println(jid);
-                    trustUser(jid);
                 }
 
             }
@@ -513,7 +515,7 @@ public class Main {
                     e.printStackTrace();
                 }
             }
-            else if (line.startsWith("/inviteuser ")){
+            else if (line.startsWith("/invite ")){
                 if(split.length>=2) {
                     MultiUserChat multiUserChat = mucm.getMultiUserChat(mucJid);
                     multiUserChat.addInvitationRejectionListener((invitee, reason, message, rejection) -> System.out.println("Invitation rejected"));
