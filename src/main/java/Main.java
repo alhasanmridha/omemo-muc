@@ -546,13 +546,19 @@ public class Main {
                 if(split.length>=2) {
                     MultiUserChat multiUserChat = mucm.getMultiUserChat(mucJid);
                     multiUserChat.addInvitationRejectionListener((invitee, reason, message, rejection) -> System.out.println("Invitation rejected"));
-                    for (int i = 1; i < split.length; i++) {
-                        multiUserChat.invite(JidCreate.entityBareFrom(split[i] + "@ckotha.com"), "No reason. Just want to talk.");
+                    if (split[1].matches("-?\\d+(\\.\\d+)?")) {
+                        int numberOfUser = Integer.parseInt(split[1]);
+                        for (int i = 1; i < numberOfUser; i++) {
+                            multiUserChat.invite(JidCreate.entityBareFrom(rootName + i + "@" + serverName), "No reason. Just want to talk.");
+                        }
+                    } else {
+                        for (int i = 1; i < split.length; i++) {
+                            multiUserChat.invite(JidCreate.entityBareFrom(split[i] + "@" + serverName), "No reason. Just want to talk.");
+                        }
                     }
                 }
             }
             else if (line.startsWith("/invite")){
-
                 MultiUserChat multiUserChat = mucm.getMultiUserChat(mucJid);
                 multiUserChat.addInvitationRejectionListener((invitee, reason, message, rejection) -> System.out.println("Invitation rejected"));
                 for(int i=1;i<10;i++) {
