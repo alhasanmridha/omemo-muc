@@ -9,9 +9,7 @@ import org.jivesoftware.smack.roster.Roster;
 import org.jivesoftware.smack.roster.RosterEntry;
 import org.jivesoftware.smack.tcp.XMPPTCPConnection;
 import org.jivesoftware.smack.tcp.XMPPTCPConnectionConfiguration;
-import org.jivesoftware.smack.util.StringUtils;
 import org.jivesoftware.smack.util.TLSUtils;
-import org.jivesoftware.smackx.carbons.CarbonManager;
 import org.jivesoftware.smackx.carbons.packet.CarbonExtension;
 import org.jivesoftware.smackx.muc.MultiUserChat;
 import org.jivesoftware.smackx.muc.MultiUserChatException;
@@ -20,7 +18,6 @@ import org.jivesoftware.smackx.muc.RoomInfo;
 import org.jivesoftware.smackx.omemo.OmemoConfiguration;
 import org.jivesoftware.smackx.omemo.OmemoManager;
 import org.jivesoftware.smackx.omemo.OmemoMessage;
-import org.jivesoftware.smackx.omemo.OmemoService;
 import org.jivesoftware.smackx.omemo.exceptions.*;
 import org.jivesoftware.smackx.omemo.internal.OmemoCachedDeviceList;
 import org.jivesoftware.smackx.omemo.internal.OmemoDevice;
@@ -47,6 +44,7 @@ import org.whispersystems.libsignal.IdentityKey;
 
 import java.io.*;
 import java.net.InetAddress;
+import java.security.NoSuchAlgorithmException;
 import java.security.Security;
 import java.util.*;
 
@@ -65,7 +63,7 @@ public class Main {
     private final static File storePath = new File("store");
     private int sendCounter = 0;
     private int receiveCounter = 0;
-    private int totalNumberOfMessage = 10;
+    private int sendLimit = 10;
     private static String GJID,GPASSWORD;
     private static final String serverName = "ckotha.com";
     private static String rootName;
@@ -169,7 +167,7 @@ public class Main {
             public void onOmemoMessageReceived(Stanza stanza, OmemoMessage.Received received) {
                 BareJid sender = stanza.getFrom().asBareJid();
                 if (received.isKeyTransportMessage()) {
-                    System.out.println("Got keyTransported message for: "+sender.toString());
+                    System.out.println("Got keyTransported message from: "+sender.toString());
                     return;
                 }
                 String decryptedBody = received.getBody();
@@ -202,6 +200,13 @@ public class Main {
                 reader.getTerminal().writer().flush();
             }
             if(s!=null){
+                if(s.split("@").length==2){
+                    if(s.split("@")[0].equals("MESSAGE_STARTER")) {
+                        sendCounter = 0;
+                        receiveCounter = 0;
+                        sendLimit = Integer.parseInt(s.split("@")[1]);
+                    }
+                }
                 increaseReceiveCounter();
                 try {
                     sendMucMessage(mucJid, "Hi There! I am message no." + sendCounter + " from " + connection.getUser().asEntityBareJidString());
@@ -292,10 +297,12 @@ public class Main {
                 receiveCounter = 0;
             }
             else if (line.startsWith("/start")) {
-//                if(split.length == 2){
-                    sendMucMessage(mucJid,"Hi There! I am the first message.");
-                    sendCounter = 1;
-//                }
+                if(split.length == 2){
+                    sendLimit = Integer.parseInt(split[1]);
+                }
+                sendCounter=0;
+                receiveCounter=0;
+                sendMucMessage(mucJid,"MESSAGE_STARTER@"+ sendLimit);
             }
 
             // Add contacts
@@ -316,6 +323,10 @@ public class Main {
                     roster.removeEntry(roster.getEntry(b));
                     System.out.println("Removed contact from roster");
                 }
+            }
+
+            else if(line.startsWith("/rebuild")) {
+                rebuildSession();
             }
 
             // List available contacts/groups or device list of selected contact
@@ -586,7 +597,7 @@ public class Main {
             }
 
             // Send ratchet update message to repair/forward session with contact
-            else if(line.startsWith("/ratchetUpdate")) {
+            else if(line.startsWith("/update")) {
                 if(split.length == 2) {
                     BareJid jid = getJid(split[1]);
                     OmemoCachedDeviceList cachedDeviceList = service.getOmemoStoreBackend().loadCachedDeviceList(omemoManager.getOwnDevice(), jid);
@@ -739,7 +750,6 @@ public class Main {
     }
     public void trustUser(BareJid jid) throws IOException, CorruptedOmemoKeyException, CannotEstablishOmemoSessionException, SmackException.NotLoggedInException, SmackException.NoResponseException, SmackException.NotConnectedException, InterruptedException, XMPPException.XMPPErrorException, PubSubException.NotALeafNodeException {
 
-        System.out.println(jid);
         omemoManager.requestDeviceListUpdateFor(jid);
         for (OmemoDevice device : omemoManager.getDevicesOf(jid)) {
             OmemoFingerprint fp = omemoManager.getFingerprint(device);
@@ -766,7 +776,7 @@ public class Main {
         }
     }
     public synchronized void sendMucMessage(EntityBareJid mucJid, String message) throws IOException, SmackException.NotLoggedInException, InterruptedException, CannotEstablishOmemoSessionException, PubSubException.NotALeafNodeException, XMPPException.XMPPErrorException, SmackException.NotConnectedException, CorruptedOmemoKeyException, SmackException.NoResponseException, UndecidedOmemoIdentityException, NoOmemoSupportException, CryptoFailedException {
-        if(sendCounter == totalNumberOfMessage) return;
+        if(sendCounter == sendLimit) return;
         Thread.sleep(1000);
         if (mucJid != null) {
             MultiUserChat muc = mucm.getMultiUserChat(mucJid.asEntityBareJidIfPossible());
@@ -799,7 +809,6 @@ public class Main {
         receiveCounter++;
     }
     public void trust(BareJid jid) throws InterruptedException, PubSubException.NotALeafNodeException, SmackException.NoResponseException, SmackException.NotConnectedException, XMPPException.XMPPErrorException, IOException, SmackException.NotLoggedInException, CorruptedOmemoKeyException, CannotEstablishOmemoSessionException {
-        omemoManager.requestDeviceListUpdateFor(jid);
 
         for (OmemoDevice device : omemoManager.getDevicesOf(jid)) {
             OmemoFingerprint fp = omemoManager.getFingerprint(device);
@@ -820,8 +829,8 @@ public class Main {
         }
     }
 
-    private boolean rebuildSession() throws IOException, CorruptedOmemoKeyException, InterruptedException, SmackException.NoResponseException, SmackException.NotConnectedException, CannotEstablishOmemoSessionException, SmackException.NotLoggedInException {
-        Set<OmemoDevice> devices = omemoManager.getDevicesOf(omemoManager.getOwnJid());
+    private boolean rebuildSession() throws IOException, CorruptedOmemoKeyException, InterruptedException, SmackException.NoResponseException, SmackException.NotConnectedException, CannotEstablishOmemoSessionException, SmackException.NotLoggedInException, CryptoFailedException, NoSuchAlgorithmException {
+        Set<OmemoDevice> devices = new HashSet<>();
         for (RosterEntry r : roster.getEntries()) {
             if(roster.getPresence(r.getJid()).isAvailable()) {
                 System.out.println("::::::::::::::::: : Al-Hasan : :::::::::::::::::::::::: : Building Session with ::: " + r.getJid() + ", Online? " + roster.getPresence(r.getJid()).isAvailable());
@@ -829,7 +838,7 @@ public class Main {
                 for (OmemoDevice device : devices) {
                     if(service.getOmemoStoreBackend().loadRawSession(omemoManager.getOwnDevice(),device) == null) {
                         System.out.println("Trying to build a fresh session with " + device.getDeviceId());
-                        omemoManager.rebuildSessionWith(device);
+                        omemoManager.sendRatchetUpdateMessage(device);
                     } else{
                         System.out.println("Already has session with: " + device.getDeviceId());
                     }
