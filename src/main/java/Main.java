@@ -2,6 +2,7 @@ import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.jivesoftware.smack.*;
 import org.jivesoftware.smack.chat.Chat;
 import org.jivesoftware.smack.chat.ChatManager;
+import org.jivesoftware.smack.packet.IQ;
 import org.jivesoftware.smack.packet.Message;
 import org.jivesoftware.smack.packet.Presence;
 import org.jivesoftware.smack.packet.Stanza;
@@ -157,7 +158,7 @@ public class Main {
         omemoManager.initialize();
 
         // Create the XMPP address (JID) of the MUC.
-        EntityBareJid mucJid = JidCreate.entityBareFrom(rootName+"grp@conference.ckotha.com");
+        EntityBareJid mucJid = JidCreate.entityBareFrom(rootName+"mucsubgrp@conference.ckotha.com");
 
         Resourcepart nickname = Resourcepart.from(rootName+"bot");
         System.out.println("Logged in. Begin setting up OMEMO...");
@@ -506,7 +507,7 @@ public class Main {
                     muc.create(nickname);
                     Form form = muc.getConfigurationForm();
                     Form answerForm = form.createAnswerForm();
-                    answerForm.setAnswer("muc#roomconfig_roomname", "another_name");
+                    answerForm.setAnswer("muc#roomconfig_roomname", "muc_test");
                     answerForm.setAnswer("muc#roomconfig_roomdesc", "this is room description");
                     answerForm.setAnswer("muc#roomconfig_persistentroom", true);
                     answerForm.setAnswer("muc#roomconfig_publicroom", false);
@@ -516,6 +517,10 @@ public class Main {
                 } catch (Exception e){
                     e.printStackTrace();
                 }
+            }
+            else if(line.startsWith("/sub")){
+                MultiUserChat muc = mucm.getMultiUserChat(mucJid);
+                addSubscription(muc);
             }
             else if (line.startsWith("/info")){
                 RoomInfo info = mucm.getRoomInfo(mucJid);
@@ -532,13 +537,14 @@ public class Main {
                 System.out.println("Room Persistent: " +info.isPersistent());
                 System.out.println("Room SubjectModifiable: " + info.isSubjectModifiable());
                 System.out.println("Room isNonanonymous: " + info.isNonanonymous());
+                System.out.println("Room MUS-sub: " + info.getPubSub());
                 System.out.println("MultiUserChatSupport: " + omemoManager.multiUserChatSupportsOmemo(mucm.getMultiUserChat(mucJid)));
             }
             else if (line.startsWith("/join")){
                 try {
                     MultiUserChat multiUserChat = mucm.getMultiUserChat(mucJid);
                     multiUserChat.createOrJoin(Resourcepart.from(GJID));
-                } catch (MultiUserChatException.MucAlreadyJoinedException e){
+                } catch (MultiUserChatException.MucAlreadyJoinedException  | XMPPException e){
                     e.printStackTrace();
                 }
             }
@@ -851,7 +857,62 @@ public class Main {
                 }
             }
         }
-
         return true;
+    }
+    public void addSubscription(MultiUserChat chatRoom) {
+
+        try {
+            IQ iq = new IQ("subscribe", "urn:xmpp:mucsub:0") {
+                @Override
+                protected IQChildElementXmlStringBuilder getIQChildElementBuilder(IQChildElementXmlStringBuilder xml)
+                {
+                    xml.attribute("nick", GJID);
+                    xml.attribute("password", "");
+                    xml.rightAngleBracket();
+
+                    xml.halfOpenElement("event");
+                    xml.attribute("node", "urn:xmpp:mucsub:nodes:messages");
+                    xml.closeEmptyElement();
+
+                    xml.halfOpenElement("event");
+                    xml.attribute("node", "urn:xmpp:mucsub:nodes:affiliations");
+                    xml.closeEmptyElement();
+
+                    xml.halfOpenElement("event");
+                    xml.attribute("node", "urn:xmpp:mucsub:nodes:subject");
+                    xml.closeEmptyElement();
+
+                    xml.halfOpenElement("event");
+                    xml.attribute("node", "urn:xmpp:mucsub:nodes:config");
+                    xml.closeEmptyElement();
+
+                    xml.halfOpenElement("event");
+                    xml.attribute("node", "urn:xmpp:mucsub:nodes:presence");
+                    xml.closeEmptyElement();
+
+                    xml.halfOpenElement("event");
+                    xml.attribute("node", "urn:xmpp:mucsub:nodes:system");
+                    xml.closeEmptyElement();
+                    return xml;
+                }
+            };
+            System.out.println("User ID: " + connection.getUser());
+            iq.setFrom(connection.getUser());
+            System.out.println("Room: " + chatRoom.getRoom());
+            iq.setTo(chatRoom.getRoom());
+            iq.setStanzaId(UUID.randomUUID().toString());
+            iq.setType(IQ.Type.set);
+            String csStanzaXML = iq.toString();
+            System.out.println("Final IQ Stanza: " + csStanzaXML);
+//            connection.sendStanza(iq);
+            IQ iqResponse = connection.sendIqRequestAndWaitForResponse(iq);
+            System.out.println("Response: " + iqResponse.getChildElementXML());
+//            connection.createStanzaCollectorAndSend(iq).nextResultOrThrow();
+            //sendStanza(iq);
+        }
+        catch (Exception ed) {
+            ed.printStackTrace();
+            System.out.println("Group Crate Exception Message = " + ed.getMessage());
+        }
     }
 }
