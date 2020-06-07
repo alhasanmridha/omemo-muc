@@ -11,6 +11,7 @@ import org.jivesoftware.smack.roster.RosterEntry;
 import org.jivesoftware.smack.tcp.XMPPTCPConnection;
 import org.jivesoftware.smack.tcp.XMPPTCPConnectionConfiguration;
 import org.jivesoftware.smack.util.TLSUtils;
+import org.jivesoftware.smackx.address.MultipleRecipientManager;
 import org.jivesoftware.smackx.carbons.packet.CarbonExtension;
 import org.jivesoftware.smackx.muc.MultiUserChat;
 import org.jivesoftware.smackx.muc.MultiUserChatException;
@@ -38,6 +39,7 @@ import org.jline.terminal.Terminal;
 import org.jline.terminal.TerminalBuilder;
 import org.jxmpp.jid.BareJid;
 import org.jxmpp.jid.EntityBareJid;
+import org.jxmpp.jid.Jid;
 import org.jxmpp.jid.impl.JidCreate;
 import org.jxmpp.jid.parts.Resourcepart;
 import org.jxmpp.stringprep.XmppStringprepException;
@@ -64,7 +66,7 @@ public class Main {
     private final static File storePath = new File("store");
     private int sendCounter = 0;
     private int receiveCounter = 0;
-    private int sendLimit = 10;
+    private int sendLimit = 1;
     private static String GJID,GPASSWORD;
     private static final String serverName = "ckotha.com";
     private static String rootName;
@@ -98,12 +100,16 @@ public class Main {
         XMPPTCPConnectionConfiguration.Builder configBuilder = XMPPTCPConnectionConfiguration.builder()
                 .setUsernameAndPassword(jidname,password)
                 .setXmppDomain(serverName)
-                .setHostAddress(InetAddress.getByName(serverName))
+//                .setHostAddress(InetAddress.getByName(serverName))
                 .setResource("omemo")
-                .setSecurityMode(ConnectionConfiguration.SecurityMode.required)
-                .setPort(5222);
-        TLSUtils.acceptAllCertificates(configBuilder);
-        TLSUtils.disableHostnameVerificationForTlsCertificates(configBuilder);
+//                .setSecurityMode(ConnectionConfiguration.SecurityMode.required)
+                .setPort(5222)
+                .setHostAddress(InetAddress.getByName("157.230.36.183"))
+                //.setHostAddress(InetAddress.getByName(mConfig.conn_ip))	//Failover IP onix
+                .setSecurityMode(ConnectionConfiguration.SecurityMode.ifpossible) //mazhar ssl
+                .setCompressionEnabled(false);
+//        TLSUtils.acceptAllCertificates(configBuilder);
+//        TLSUtils.disableHostnameVerificationForTlsCertificates(configBuilder);
         XMPPTCPConnectionConfiguration config = configBuilder.build();
         connection = new XMPPTCPConnection(config);
         SignalOmemoService.acknowledgeLicense();
@@ -276,7 +282,7 @@ public class Main {
                     System.out.println(current != null ? current.getParticipant() : "null");
                 } else {
                     String id = split[1];
-                    BareJid jid = getJid(id);
+                    BareJid jid = getJid(id + "@" + serverName);
                     if(jid != null) {
                         current = cm.createChat(jid.asEntityJidIfPossible());
                         current.sendMessage(l.substring(id.length() + 1));
@@ -521,6 +527,45 @@ public class Main {
             else if(line.startsWith("/sub")){
                 MultiUserChat muc = mucm.getMultiUserChat(mucJid);
                 addSubscription(muc);
+            }
+            else if(line.startsWith("/multiple")){
+                sendCounter = 0;
+                receiveCounter = 0;
+                List<BareJid> to = Collections.singletonList(getJid("s1@ckotha.com"));
+                List<BareJid> cc = Collections.singletonList(getJid("s2@ckotha.com"));
+                List<BareJid> bcc = Collections.singletonList(getJid("s3@ckotha.com"));
+                Set<BareJid> all = new HashSet<>();
+                all.addAll(to);
+                all.addAll(cc);
+                all.addAll(bcc);
+                if (!all.isEmpty()) {
+                    String message = "";
+                    for (int i = 2; i < split.length; i++) {
+                        message += split[i] + " ";
+                    }
+                    OmemoMessage.Sent encrypted = null;
+                    try {
+                        encrypted = omemoManager.encrypt(all, message.trim());
+                    } catch (UndecidedOmemoIdentityException e) {
+                        System.out.println("There are undecided identities:");
+                        for (OmemoDevice d : e.getUndecidedDevices()) {
+                            System.out.println(d.toString());
+                            BareJid jid = getJid(d.toString().split(":")[0]);
+                            trustUser(jid);
+                        }
+                    } catch (SmackException.NotConnectedException | IOException | CryptoFailedException | SmackException.NotLoggedInException | SmackException.NoResponseException | InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                    if(encrypted == null){
+                        encrypted = omemoManager.encrypt(all, message.trim());
+                        System.out.println("Trying to encrypt after trusting some undecided user");
+                    }
+                    if(encrypted != null) {
+                        Message m = new Message();
+                        m.addExtension(encrypted.getElement());
+                        MultipleRecipientManager.send(connection, m, to, cc, bcc);
+                    }
+                }
             }
             else if (line.startsWith("/info")){
                 RoomInfo info = mucm.getRoomInfo(mucJid);
