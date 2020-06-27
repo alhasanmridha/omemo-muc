@@ -172,8 +172,8 @@ public class XMPPWebSocketConnection extends AbstractXMPPConnection {
 
             // Send the session creation request
             client.send(ComposableBody.builder()
-                    .setNamespaceDefinition("xmpp", XMPP_BOSH_NS)
-                    .setAttribute(BodyQName.createWithPrefix(XMPP_BOSH_NS, "version", "xmpp"), "1.0")
+//                    .setNamespaceDefinition("xmpp", XMPP_BOSH_NS)
+                    .setAttribute(BodyQName.createWithPrefix(XMPP_BOSH_NS, "version",null), "1.0")
                     .build());
         } catch (Exception e) {
             throw new GenericConnectionException(e);

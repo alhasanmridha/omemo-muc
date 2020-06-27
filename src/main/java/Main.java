@@ -6,6 +6,7 @@ import org.jxmpp.stringprep.XmppStringprepException;
 import websocket.WebSocketConfiguration;
 import websocket.XMPPWebSocketConnection;
 
+import java.net.InetAddress;
 import java.security.Security;
 import java.util.Scanner;
 
@@ -43,7 +44,7 @@ public class Main {
         try {
             conf = WebSocketConfiguration.builder()
                     .setUseHttps(false)
-                    .setHost("157.230.36.183")
+                    .setHostAddress(InetAddress.getByName("157.230.36.183"))
                     .setPort(5280)
                     .setFile("xmpp")
                     .setXmppDomain(domainName)
@@ -53,6 +54,7 @@ public class Main {
             e.printStackTrace();
         }
         connection = new XMPPWebSocketConnection(conf);
+//        connection.setReplyTimeout(1000000);
         connection.connect();
     }
 

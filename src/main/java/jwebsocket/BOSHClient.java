@@ -848,24 +848,24 @@ public final class BOSHClient {
         
         Builder builder = orig.rebuild();
         builder.setAttribute(Attributes.TO, cfg.getTo());
-        builder.setAttribute(Attributes.XML_LANG, cfg.getLang());
-        builder.setAttribute(Attributes.VER,
-                AttrVersion.getSupportedVersion().toString());
+//        builder.setAttribute(Attributes.XML_LANG, cfg.getLang());
+//        builder.setAttribute(Attributes.VER,
+//                AttrVersion.getSupportedVersion().toString());
         // NOTE: when WAIT is set to 60, HOLD is set to 1 and the CM replies
         // with REQ = 1 then the connection can end up stuck up to 60 seconds
         // if empty request is sent and there is no incoming traffic during that
         // time.
-        builder.setAttribute(Attributes.WAIT, "60");
-        builder.setAttribute(Attributes.HOLD, "1");
-        builder.setAttribute(Attributes.RID, Long.toString(rid));
+//        builder.setAttribute(Attributes.WAIT, "60");
+//        builder.setAttribute(Attributes.HOLD, "1");
+//        builder.setAttribute(Attributes.RID, Long.toString(rid));
         applyRoute(builder);
         applyFrom(builder);
         // NOTE: Using only one thread and waiting for the acknowledgment slows
         // the connection down because it postpones sending every packet until
         // previous ack is received.
-        if (cfg.isAckEnabled() ) {
-            builder.setAttribute(Attributes.ACK, "1");
-        }
+//        if (cfg.isAckEnabled() ) {
+//            builder.setAttribute(Attributes.ACK, "1");
+//        }
 
         // Make sure the following are NOT present (i.e., during retries)
         builder.setAttribute(Attributes.SID, null);

@@ -32,7 +32,7 @@ public final class BodyQName {
      * BOSH namespace URI.
      */
     static final String BOSH_NS_URI =
-            "http://jabber.org/protocol/httpbind";
+            "urn:ietf:params:xml:ns:xmpp-framing";
 
     /**
      * Namespace URI.

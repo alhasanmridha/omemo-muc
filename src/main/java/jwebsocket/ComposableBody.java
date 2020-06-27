@@ -340,11 +340,11 @@ public final class ComposableBody extends AbstractBody {
         builder.append(XMLConstants.XMLNS_ATTRIBUTE);
         builder.append("='");
         builder.append(bodyName.getNamespaceURI());
-        builder.append("'>");
-        if (payload != null) {
-            builder.append(payload);
-        }
-        builder.append("</body>");
+        builder.append("'/>");
+//        if (payload != null) {
+//            builder.append(payload);
+//        }
+//        builder.append("</body>");
         return builder.toString();
     }
 

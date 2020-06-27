@@ -60,7 +60,7 @@ public final class WebSocketConfiguration extends ConnectionConfiguration {
     }
 
     public URI getURI() throws URISyntaxException {
-        return new URI((https ? "wss://" : "ws://") + this.host + ":" + this.port + file);
+        return new URI((https ? "wss://" : "ws://") + this.hostAddress.getHostAddress() + ":" + this.port + file);
     }
 
     public Map<String, String> getHttpHeaders() {

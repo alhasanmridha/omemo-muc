@@ -136,7 +136,10 @@ final class ApacheHTTPSender implements HTTPSender {
             sslFactory.setHostnameVerifier(org.apache.http.conn.ssl.SSLSocketFactory.ALLOW_ALL_HOSTNAME_VERIFIER);
             schemeRegistry.register(
                     new org.apache.http.conn.scheme.Scheme("https", sslFactory, 443));
-
+        schemeRegistry.register(
+                new org.apache.http.conn.scheme.Scheme("ws", sslFactory, 5280));
+        schemeRegistry.register(
+                new org.apache.http.conn.scheme.Scheme("wss", sslFactory, 5280));
         // Create an HttpClient with the ThreadSafeClientConnManager.
         // This connection manager must be used if more than one thread will
         // be using the HttpClient.

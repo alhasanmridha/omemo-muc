@@ -98,7 +98,7 @@ public abstract class AbstractBody {
      * @return qualified name
      */
     static BodyQName getBodyQName() {
-        return BodyQName.createBOSH("body");
+        return BodyQName.createBOSH("open");
     }
 
 }
